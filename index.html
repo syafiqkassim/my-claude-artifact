@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Log Switch Down ITOC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;padding:0}
+img{max-width:100%}
+[hidden]:not([hidden=until-found i]){display:none!important}
+/* Layout: NOC console — summary strip, entry form, then a stream of incident rows with a severity stripe. */
+:root{
+  color-scheme:light;
+  --bg:#eef1f3; --surface:#ffffff; --sunk:#e3e8ec; --line:#cfd7dd;
+  --fg:#16222b; --muted:#5a6a76; --accent:#0f6e86; --accent-fg:#ffffff;
+  --down:#c8372d; --down-bg:#fbe7e5; --warn:#b36b00; --warn-bg:#fdf0da;
+  --up:#1d7a46; --up-bg:#e1f3e8; --watch:#4b5bb5; --watch-bg:#e7e9f8;
+  --display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e151a; --surface:#152028; --sunk:#0b1115; --line:#26343e;
+  --fg:#e3eaef; --muted:#93a4b0; --accent:#4fb6d0; --accent-fg:#06222a;
+  --down:#ff7a6e; --down-bg:#3a1a17; --warn:#f2b04a; --warn-bg:#382a12;
+  --up:#5fd08f; --up-bg:#15301f; --watch:#9aa6ff; --watch-bg:#1f2448; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e151a; --surface:#152028; --sunk:#0b1115; --line:#26343e;
+  --fg:#e3eaef; --muted:#93a4b0; --accent:#4fb6d0; --accent-fg:#06222a;
+  --down:#ff7a6e; --down-bg:#3a1a17; --warn:#f2b04a; --warn-bg:#382a12;
+  --up:#5fd08f; --up-bg:#15301f; --watch:#9aa6ff; --watch-bg:#1f2448; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--body)}
+.wrap{max-width:980px;margin:0 auto;padding-block:20px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:grid;gap:18px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.eyebrow{font:600 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1{font:700 30px/1.05 var(--display);margin:6px 0 0;text-wrap:balance;letter-spacing:.01em}
+.sub{color:var(--muted);margin:4px 0 0;font-size:14px}
+button{font:600 14px/1 var(--body);border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:10px 14px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+button.ghost{background:transparent}
+button.danger{color:var(--down);border-color:var(--down)}
+button:disabled{opacity:.5;cursor:not-allowed}
+
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.stat{background:var(--surface);padding:12px 14px;min-width:0}
+.stat b{display:block;font:700 26px/1 var(--display);font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.stat.alert b{color:var(--down)}
+@media (max-width:560px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.panel h2{font:600 19px/1.2 var(--display);margin:0 0 12px;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px}
+.full{grid-column:1/-1}
+@media (max-width:620px){.grid{grid-template-columns:minmax(0,1fr)}}
+label{display:grid;gap:5px;font-size:13px;font-weight:600;color:var(--muted);min-width:0}
+label small{font-weight:400}
+input,select,textarea{font:15px/1.3 var(--body);color:var(--fg);background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:10px 11px;width:100%;min-width:0}
+input.mono{font-family:var(--mono);font-size:14px}
+textarea{min-height:76px;resize:vertical}
+.rowbtn{display:flex;gap:8px;flex-wrap:wrap}
+.inline{display:flex;gap:6px}
+.inline input{flex:1}
+.inline button{padding:8px 10px;font-size:12px;white-space:nowrap}
+.form-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;margin-top:14px}
+.msg{font-size:13px;margin-right:auto;align-self:center;color:var(--muted)}
+.msg.err{color:var(--down)}
+
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.toolbar input{flex:1 1 220px}
+.toolbar select{flex:0 1 190px}
+.list{display:grid;gap:10px}
+.item{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--muted);border-radius:10px;padding:12px 14px;display:grid;gap:8px;min-width:0}
+.item.s-down{border-left-color:var(--down)} .item.s-act{border-left-color:var(--warn)}
+.item.s-up{border-left-color:var(--up)} .item.s-watch{border-left-color:var(--watch)}
+.top{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;justify-content:space-between}
+.host{font:600 16px/1.3 var(--mono);word-break:break-all}
+.ip{font:400 13px var(--mono);color:var(--muted)}
+.pill{font:600 11px/1 var(--body);letter-spacing:.06em;text-transform:uppercase;padding:5px 8px;border-radius:99px;white-space:nowrap}
+.p-down{background:var(--down-bg);color:var(--down)} .p-act{background:var(--warn-bg);color:var(--warn)}
+.p-up{background:var(--up-bg);color:var(--up)} .p-watch{background:var(--watch-bg);color:var(--watch)}
+.times{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;font-size:12px}
+.times div{min-width:0}
+.times span{display:block;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-size:11px}
+.times b{font:500 13px/1.3 var(--mono);font-variant-numeric:tabular-nums}
+.times b.live{color:var(--down)}
+@media (max-width:560px){.times{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.remark{margin:0;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.meta{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
+.meta .rowbtn button{padding:7px 10px;font-size:12px}
+.empty{text-align:center;color:var(--muted);padding:28px 16px;border:1px dashed var(--line);border-radius:12px}
+.empty strong{display:block;color:var(--fg);font:600 17px var(--display);margin-bottom:4px}
+.notice{padding:10px 12px;border-radius:8px;background:var(--warn-bg);color:var(--warn);font-size:13px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">ITOC · UUM</div>
+      <h1>Log Switch Down</h1>
+      <p class="sub">Rekod setiap insiden switch: bila dilaporkan, bila down, bila up semula.</p>
+    </div>
+    <div class="rowbtn">
+      <button id="btnExport" class="ghost" type="button">Muat turun CSV</button>
+      <button id="btnNew" class="primary" type="button">+ Rekod baru</button>
+    </div>
+  </header>
+
+  <div id="notice" class="notice" hidden></div>
+
+  <section class="stats" aria-label="Ringkasan">
+    <div class="stat alert"><b id="stDown">–</b><span>Masih down</span></div>
+    <div class="stat"><b id="stToday">–</b><span>Insiden hari ini</span></div>
+    <div class="stat"><b id="stMonth">–</b><span>Bulan ini</span></div>
+    <div class="stat"><b id="stAvg">–</b><span>Purata tempoh down</span></div>
+  </section>
+
+  <form id="form" class="panel" hidden>
+    <h2><span id="formTitle">Rekod baru</span><button type="button" class="ghost" id="btnClose">Tutup</button></h2>
+    <div class="grid">
+      <label>Hostname
+        <input id="fHost" class="mono" required placeholder="cth. SW-DPP-L2-01" autocomplete="off">
+      </label>
+      <label>IP address
+        <input id="fIp" class="mono" placeholder="cth. 10.1.20.15" inputmode="decimal" autocomplete="off">
+      </label>
+      <label>Waktu laporan dalam group WhatsApp
+        <div class="inline"><input id="fReport" type="datetime-local"><button type="button" data-now="fReport">Sekarang</button></div>
+      </label>
+      <label>Waktu switch down
+        <div class="inline"><input id="fDown" type="datetime-local" required><button type="button" data-now="fDown">Sekarang</button></div>
+      </label>
+      <label>Waktu switch up semula <small>(kosongkan jika masih down)</small>
+        <div class="inline"><input id="fUp" type="datetime-local"><button type="button" data-now="fUp">Sekarang</button></div>
+      </label>
+      <label>Status
+        <select id="fStatus">
+          <option value="down">Down</option>
+          <option value="act">Dalam tindakan</option>
+          <option value="watch">Pemantauan</option>
+          <option value="up">Up / Selesai</option>
+        </select>
+      </label>
+      <label class="full">Remark / komen
+        <textarea id="fRemark" placeholder="Punca, tindakan diambil, pihak yang dimaklumkan…"></textarea>
+      </label>
+      <label class="full">Petugas
+        <select id="fBySel" required></select>
+        <input id="fBy" placeholder="Taip nama petugas" autocomplete="off" hidden>
+      </label>
+    </div>
+    <div class="form-actions">
+      <span id="formMsg" class="msg"></span>
+      <button type="button" class="danger" id="btnDelete" hidden>Padam</button>
+      <button type="submit" class="primary" id="btnSave">Simpan</button>
+    </div>
+  </form>
+
+  <section class="panel" style="display:grid;gap:12px">
+    <div class="toolbar">
+      <input id="q" type="search" placeholder="Cari hostname, IP atau remark">
+      <select id="fFilter" aria-label="Tapis status">
+        <option value="all">Semua status</option>
+        <option value="open">Belum selesai</option>
+        <option value="down">Down</option>
+        <option value="act">Dalam tindakan</option>
+        <option value="watch">Pemantauan</option>
+        <option value="up">Up / Selesai</option>
+      </select>
+    </div>
+    <div id="list" class="list">
+      <div class="empty"><strong>Memuatkan rekod…</strong>Insiden switch yang direkod oleh petugas akan muncul di sini.</div>
+    </div>
+  </section>
+</div>
+
+<script>
+const STATUS = {down:"Down", act:"Dalam tindakan", watch:"Pemantauan", up:"Up / Selesai"};
+const PETUGAS = ["Nazir","Azrul","Samsul","Syafiq","Fazlina","Zaliza","Shafie","Syamshul","Amirul"];
+const OTHER = "__lain";
+const $ = id => document.getElementById(id);
+let db = null, col = null, downloads = null, rows = [], editing = null, canWrite = true, myName = "";
+
+function nowLocal(){
+  const d = new Date(); d.setSeconds(0,0);
+  const p = n => String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function fmt(s){
+  if(!s) return "—";
+  const d = new Date(s); if(isNaN(d)) return s;
+  const p = n => String(n).padStart(2,"0");
+  return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function minsBetween(a,b){ const x=new Date(a), y=new Date(b); if(isNaN(x)||isNaN(y)) return null; return Math.max(0,Math.round((y-x)/60000)); }
+function dur(m){ if(m==null) return "—"; const d=Math.floor(m/1440), h=Math.floor(m%1440/60), mm=m%60;
+  return (d?d+"h ":"")+(d||h?h+"j ":"")+mm+"m"; }
+function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function showNotice(t){ const n=$("notice"); n.textContent=t; n.hidden=!t; }
+
+function render(){
+  const q = $("q").value.trim().toLowerCase(), f = $("fFilter").value;
+  const now = nowLocal(), today = now.slice(0,10), month = now.slice(0,7);
+  const open = rows.filter(r=>r.status!=="up");
+  $("stDown").textContent = open.length;
+  $("stToday").textContent = rows.filter(r=>(r.downAt||"").startsWith(today)).length;
+  $("stMonth").textContent = rows.filter(r=>(r.downAt||"").startsWith(month)).length;
+  const closed = rows.map(r=>r.upAt?minsBetween(r.downAt,r.upAt):null).filter(m=>m!=null);
+  $("stAvg").textContent = closed.length ? dur(Math.round(closed.reduce((a,b)=>a+b,0)/closed.length)) : "—";
+
+  const list = rows.filter(r=>{
+    if(f==="open" && r.status==="up") return false;
+    if(f!=="all" && f!=="open" && r.status!==f) return false;
+    if(q && !`${r.host} ${r.ip} ${r.remark} ${r.by}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const el = $("list");
+  if(!rows.length){ el.innerHTML = `<div class="empty"><strong>Belum ada insiden direkod</strong>Tekan “+ Rekod baru” apabila switch dilaporkan down dalam group WhatsApp.</div>`; return; }
+  if(!list.length){ el.innerHTML = `<div class="empty"><strong>Tiada padanan</strong>Cuba kata carian atau status lain.</div>`; return; }
+  el.innerHTML = list.map(r=>{
+    const live = !r.upAt;
+    const m = minsBetween(r.downAt, r.upAt || now);
+    return `<article class="item s-${esc(r.status)}">
+      <div class="top"><div><div class="host">${esc(r.host)}</div>${r.ip?`<div class="ip">${esc(r.ip)}</div>`:""}</div>
+        <span class="pill p-${esc(r.status)}">${esc(STATUS[r.status]||r.status)}</span></div>
+      <div class="times">
+        <div><span>Lapor WhatsApp</span><b>${fmt(r.reportAt)}</b></div>
+        <div><span>Down</span><b>${fmt(r.downAt)}</b></div>
+        <div><span>Up semula</span><b>${fmt(r.upAt)}</b></div>
+        <div><span>Tempoh down</span><b class="${live?"live":""}">${dur(m)}${live?" (berterusan)":""}</b></div>
+      </div>
+      ${r.remark?`<p class="remark">${esc(r.remark)}</p>`:""}
+      <div class="meta"><span>${r.by?"Petugas: "+esc(r.by):""}</span>
+        <div class="rowbtn">${canWrite&&live?`<button type="button" data-up="${esc(r.id)}">Tandakan UP sekarang</button>`:""}
+        ${canWrite?`<button type="button" data-edit="${esc(r.id)}">Kemaskini</button>`:""}</div></div>
+    </article>`;
+  }).join("");
+}
+
+function openForm(r){
+  editing = r ? r.id : null;
+  $("formTitle").textContent = r ? "Kemaskini insiden" : "Rekod baru";
+  $("fHost").value = r?.host||""; $("fIp").value = r?.ip||"";
+  $("fReport").value = r?.reportAt||(r?"":nowLocal()); $("fDown").value = r?.downAt||(r?"":nowLocal());
+  $("fUp").value = r?.upAt||""; $("fStatus").value = r?.status||"down";
+  $("fRemark").value = r?.remark||""; setBy(r ? r.by : lastBy());
+  $("btnDelete").hidden = !r; $("btnDelete").textContent="Padam"; $("btnDelete").dataset.confirm="";
+  $("formMsg").textContent=""; $("formMsg").className="msg";
+  $("form").hidden = false; $("fHost").focus();
+  $("form").scrollIntoView({behavior:"smooth",block:"start"});
+}
+function closeForm(){ $("form").hidden = true; editing = null; }
+
+async function save(e){
+  e.preventDefault();
+  const msg = $("formMsg");
+  if(!col){ msg.textContent="Simpanan tidak tersedia pada paparan ini."; msg.className="msg err"; return; }
+  const data = {
+    host:$("fHost").value.trim(), ip:$("fIp").value.trim(),
+    reportAt:$("fReport").value, downAt:$("fDown").value, upAt:$("fUp").value,
+    status:$("fStatus").value, remark:$("fRemark").value.trim(), by:getBy(),
+    updatedAt:new Date().toISOString()
+  };
+  if(!data.host || !data.downAt){ msg.textContent="Isi hostname dan waktu switch down."; msg.className="msg err"; return; }
+  if(!data.by){ msg.textContent="Pilih nama petugas."; msg.className="msg err"; return; }
+  if(data.upAt && data.upAt < data.downAt){ msg.textContent="Waktu up semula tidak boleh lebih awal daripada waktu down."; msg.className="msg err"; return; }
+  if(data.upAt && data.status==="down") data.status="up";
+  $("btnSave").disabled = true; msg.textContent="Menyimpan…"; msg.className="msg";
+  try{
+    if(editing){ const {id:_id, ...old} = rows.find(r=>r.id===editing)||{}; await col.doc(editing).set({...old, ...data, createdAt:old.createdAt||data.updatedAt}); }
+    else await col.add({...data, createdAt:data.updatedAt});
+    try{ localStorage.setItem("itoc-petugas", data.by); }catch(e){}
+    closeForm();
+  }catch(err){
+    msg.className="msg err";
+    msg.textContent = err?.code==="invalid_argument" ? "Anda tiada akses untuk menyimpan. Minta pemilik beri akses Contributor." :
+      err?.code==="quota_exceeded" ? "Storan penuh. Padam rekod lama dahulu." : "Gagal menyimpan. Cuba lagi.";
+  }finally{ $("btnSave").disabled=false; }
+}
+
+async function del(){
+  const b = $("btnDelete");
+  if(!b.dataset.confirm){ b.dataset.confirm="1"; b.textContent="Tekan sekali lagi untuk padam"; return; }
+  try{ await col.doc(editing).delete(); closeForm(); }
+  catch(e){ $("formMsg").textContent="Gagal memadam."; $("formMsg").className="msg err"; }
+}
+
+async function markUp(id){
+  const r = rows.find(x=>x.id===id); if(!r||!col) return;
+  try{ await col.doc(id).update({upAt:nowLocal(), status:"up", updatedAt:new Date().toISOString()}); }
+  catch(e){ showNotice("Gagal mengemaskini status. Semak akses anda."); }
+}
+
+function csv(){
+  const head = ["Hostname","IP","Waktu lapor WhatsApp","Waktu down","Waktu up","Tempoh down (minit)","Status","Remark","Petugas"];
+  const lines = [head].concat(rows.map(r=>[r.host,r.ip,fmt(r.reportAt),fmt(r.downAt),r.upAt?fmt(r.upAt):"",r.upAt?minsBetween(r.downAt,r.upAt):"",STATUS[r.status]||r.status,r.remark,r.by]));
+  return lines.map(l=>l.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\r\n");
+}
+async function exportCsv(){
+  if(!downloads){ showNotice("Muat turun tidak tersedia pada paparan ini."); return; }
+  try{ await downloads.save({filename:`log-switch-down-${nowLocal().slice(0,10)}.csv`, data:"﻿"+csv()}); }catch(e){}
+}
+
+function lastBy(){ try{ const n=localStorage.getItem("itoc-petugas")||""; return PETUGAS.includes(n)?n:""; }catch(e){ return ""; } }
+function setBy(name){
+  const s=$("fBySel"), i=$("fBy");
+  if(!name){ s.value=""; i.value=""; i.hidden=true; return; }
+  if(PETUGAS.includes(name)){ s.value=name; i.value=""; i.hidden=true; }
+  else { s.value=OTHER; i.value=name; i.hidden=false; }
+}
+function getBy(){ const s=$("fBySel"); return s.value===OTHER ? $("fBy").value.trim() : s.value; }
+$("fBySel").innerHTML = `<option value="">Pilih petugas</option>` + PETUGAS.map(n=>`<option>${esc(n)}</option>`).join("") + `<option value="${OTHER}">Lain-lain (taip nama)</option>`;
+$("fBySel").onchange = ()=>{ const o=$("fBySel").value===OTHER; $("fBy").hidden=!o; if(o) $("fBy").focus(); };
+$("btnNew").onclick = ()=>openForm(null);
+$("btnClose").onclick = closeForm;
+$("form").addEventListener("submit", save);
+$("btnDelete").onclick = del;
+$("btnExport").onclick = exportCsv;
+$("q").oninput = render; $("fFilter").onchange = render;
+$("fUp").addEventListener("change", ()=>{ if($("fUp").value && $("fStatus").value==="down") $("fStatus").value="up"; });
+document.addEventListener("click", e=>{
+  const n = e.target.closest("[data-now]"); if(n){ const t=$(n.dataset.now); t.value=nowLocal(); t.dispatchEvent(new Event("change")); return; }
+  const u = e.target.closest("[data-up]"); if(u){ markUp(u.dataset.up); return; }
+  const ed = e.target.closest("[data-edit]"); if(ed){ openForm(rows.find(r=>r.id===ed.dataset.edit)); }
+});
+setInterval(render, 60000);
+
+(async ()=>{
+  if(!window.claude?.use){ showNotice("Buka halaman ini dalam Claude untuk menyimpan rekod."); rows=[]; render(); return; }
+  const [dbNs, user, dl] = await Promise.all([claude.use("db"), claude.use("user"), claude.use("downloads")]);
+  db = dbNs; downloads = dl;
+  if(!dl) $("btnExport").hidden = true;
+  if(user){
+    try{ const c = await user.can("data.write"); if(c===false){ canWrite=false; $("btnNew").hidden=true; showNotice("Anda boleh melihat log ini sahaja. Minta pemilik beri akses Contributor untuk merekod."); } }catch(e){}
+    try{ const me = await user.me(); myName = me?.name || ""; }catch(e){}
+  }
+  if(!db){ showNotice("Log tidak dapat dimuatkan. Pastikan anda log masuk ke Claude."); rows=[]; render(); return; }
+  col = db.collection("insiden");
+  col.orderBy("downAt","desc").onSnapshot(snap=>{
+    rows = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    render();
+  }, err=>{ showNotice("Sambungan ke log terputus. Muat semula halaman."); });
+})();
+</script>
+</body>
+</html>
